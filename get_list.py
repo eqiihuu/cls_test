@@ -11,9 +11,10 @@ def analyse(data_path):
         domain = line.split('\t')[0]
         sentence = line.split('\t')[1]
         sentence = unicode(sentence.replace(' ', ''), 'utf-8')
-        print i, sentence, domain
+        print i, domain, sentence
         i += 1
         vc.get_annotations(sentence, domain)
+
 
 def merge(src_path, dest_path):
     f_src = open(src_path)
@@ -22,9 +23,9 @@ def merge(src_path, dest_path):
     f_dest = open(dest_path, 'a')
     f_dest.write(content)
     f_dest.close()
-    print 'Merge %s to %s' %(src_path, dest_path)
+    print 'Merge %s to %s' % (src_path, dest_path)
 
 if __name__ == '__main__':
-    data_path = './cnn/data/nlu.train.string.cnn_format'
+    data_path = '/home/qihu/PycharmProjects/cls_test/data/nlu.train.string.cnn_format'
     analyse(data_path)
 

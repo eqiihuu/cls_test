@@ -97,7 +97,7 @@ class CNN(object):
         with tf.device(self.device), tf.name_scope("loss"):
             loss = tf.nn.softmax_cross_entropy_with_logits(logits=self.score, labels=self.y)
             self.loss = tf.reduce_mean(loss) + l2_reg * l2_loss
-            self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
+            self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
 
         # Accuracy
         with tf.device(self.device), tf.name_scope('loss'):
@@ -107,29 +107,29 @@ class CNN(object):
 
     # Training process
     def train(self, dropout, checkpoint_step, batch_size, epoch_num, model_name, version,
-              train_x, train_reg, train_y, dev_x, dev_reg, dev_y):
+              train_word, train_reg, train_y, dev_word, dev_reg, dev_y):
         curr_step = 0
-        batches = dh.batch_iter(list(zip(train_x, train_reg, train_y)), batch_size, epoch_num)
-        dev_feed_dict = {self.x_word: dev_x,
+        batches = dh.batch_iter(list(zip(train_word, train_reg, train_y)), batch_size, epoch_num)
+        dev_feed_dict = {self.x_word: dev_word,
                          self.x_reg: dev_reg,
                          self.y: dev_y,
                          self.dropout_keep: dropout}
-        # Training
         sess = tf.InteractiveSession()
         sess.run(tf.initialize_all_variables())
+        # Training
         for batch in batches:
             if len(batch) == 0:
                 continue
-            x_batch, reg_batch, y_batch = zip(*batch)
-            feed_dict = {self.x_word: x_batch,
+            word_batch, reg_batch, y_batch = zip(*batch)
+            feed_dict = {self.x_word: word_batch,
                          self.x_reg: reg_batch,
                          self.y: y_batch,
                          self.dropout_keep: dropout}
-            self.optimizer.run(feed_dict=feed_dict)
+            self.train_step.run(feed_dict=feed_dict)
             curr_step += 1
             if curr_step % checkpoint_step == 0:
                 self.accuracy.run([self.accuracy, self.prediction], dev_feed_dict)
-        acc, predictions = self.dev_step(sess, dev_x, dev_reg, dev_y)
+        acc, predictions = self.accuracy.run([self.accuracy, self.prediction], dev_feed_dict)
         export_model_path = './export/%s' % model_name
         if self.device == '/cpu:0':
             saver = tf.train.Saver(tf.global_variables())
