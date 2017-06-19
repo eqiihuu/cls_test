@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 
 import utils.data_helpers as dh
 from model.cnn import CNN
@@ -18,8 +17,8 @@ def train_cnn():
     l2_reg = 0.0001
     batch_size = 100
     learning_rate = 0.001
-    checkpoint_step = 300
-    epoch_num = 2
+    checkpoint_step = 100
+    epoch_num = 10
     version = 0
     filter_sizes = [2, 3, 4]
     filter_num = 64

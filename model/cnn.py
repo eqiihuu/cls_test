@@ -1,4 +1,3 @@
-from __future__ import print_function
 import tensorflow as tf
 from tensorflow.contrib.session_bundle import exporter
 
@@ -42,9 +41,9 @@ class CNN(object):
             self.reg_norm = tf.reduce_max(reg_vect, 1)  # Max-pooling on first dimension
 
         # Embedding layer for words
-        with tf.device(self.device), tf.variable_scope('embedding_layer'):
+        with tf.device(self.device), tf.variable_scope('embed_layer'):
             self.embedding = tf.Variable(tf.constant(0.0, shape=[vocab_size, word_embed]),
-                                         trainable=True, name='embeddomg')  # why not just create randomly?
+                                         trainable=True, name='embed')  # why not just create randomly?
             tf.assign(self.embedding, id2vect)
             self.embedded_word = tf.nn.embedding_lookup(self.embedding, self.x_word)
             self.embedded_word_expanded = tf.expand_dims(self.embedded_word, -1)  # why expanding?
@@ -52,7 +51,7 @@ class CNN(object):
         pool_output = []  # save the outputs of pooling layer
         # Convolution layer
         for i, filter_size in enumerate(filter_sizes):
-            with tf.device(self.device), tf.name_scope('conv-maxpool-%s' % filter_size):
+            with tf.device(self.device), tf.name_scope('conv-pool-%s' % filter_size):
                 filter_shape = [filter_size, word_embed, 1, filter_num]
                 W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name='W')
                 b = tf.Variable(tf.constant(0.0, shape=[filter_num]), name='b')
@@ -76,6 +75,7 @@ class CNN(object):
         self.h_pool_flat = tf.reshape(self.h_pool, [-1, filter_totalnum])
 
         # Dropout
+        self.dropout_keep = tf.placeholder('float')
         with tf.device(self.device), tf.name_scope('dropout'):
             self.reg_drop = tf.nn.dropout(self.reg_norm, self.dropout_keep)
 
@@ -121,23 +121,27 @@ class CNN(object):
             if len(batch) == 0:
                 continue
             word_batch, reg_batch, y_batch = zip(*batch)
-            feed_dict = {self.x_word: word_batch,
+            train_feed_dict = {self.x_word: word_batch,
                          self.x_reg: reg_batch,
                          self.y: y_batch,
                          self.dropout_keep: dropout}
-            self.train_step.run(feed_dict=feed_dict)
+            self.train_step.run(feed_dict=train_feed_dict)
             curr_step += 1
             if curr_step % checkpoint_step == 0:
-                self.accuracy.run([self.accuracy, self.prediction], dev_feed_dict)
-        acc, predictions = self.accuracy.run([self.accuracy, self.prediction], dev_feed_dict)
+                dev_acc = self.accuracy.eval(dev_feed_dict)
+                train_acc = self.accuracy.eval(train_feed_dict)
+                print 'Step %d, Train Accuracy: %.3f' % (curr_step, train_acc)
+                print '         Test Accuracy: ', dev_acc
+        acc = self.accuracy.eval(dev_feed_dict)
+        pred = self.prediction.eval(dev_feed_dict)
         export_model_path = './export/%s' % model_name
         if self.device == '/cpu:0':
             saver = tf.train.Saver(tf.global_variables())
             model_exporter = exporter.Exporter(saver)
-            named_tensor_binding = {"input_x": self.x_in, "input_reg": self.x_reg,
-                                    "classes": self.predictions, "scores": self.probs}
+            named_tensor_binding = {"input_x": self.x_word, "input_reg": self.x_reg,
+                                    "classes": self.prediction, "scores": self.probs}
             signature = exporter.generic_signature(named_tensor_binding)
             signatures = {"generic": signature}
             model_exporter.init(sess.graph.as_graph_def(), named_graph_signatures=signatures)
             model_exporter.export(export_model_path, tf.constant(version), sess)
-        return acc, predictions
+        return acc, pred
