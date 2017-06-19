@@ -11,9 +11,11 @@ __email__ = 'qihu@mobvoi.com'
 class CNN(object):
     # Define the model
     def __init__(self,
+                 num_class,  # number of sentence classes 51
                  id2vect,  # a list which map the word_id into a vector [5850*300],
                            # the vector is randomly initialized each time
                  use_gpu=0,  # whether to use GPU
+                 l2_reg=0.0001,  # L2 regularization
                  dropout_keep=0.5,  # keep probability of dropout layer
                  learning_rate=0.001,  # initial learning rate
                  vocab_size=5850,  # number of all words 5850
@@ -22,10 +24,8 @@ class CNN(object):
                  word_embed=300,  # the embedding length of a word 300
                  reg_length=8,  # the length of RegEx in in a sentence 8
                  reg_embed=250,  # the embedding length of a RegEx 250
-                 num_class=51,  # number of sentence classes 51
-                 filter_sizes=[2, 3, 4],  # a list size of conv filters' size
-                 filter_num=64,  # number of filters for a single filter_size
-                 l2_reg=0.001  # L2 regularization
+                 filter_sizes=[3, ],  # a list size of conv filters' size
+                 filter_num=64  # number of filters for a single filter_size
                  ):
         self.device = (use_gpu and '/gpu:0') or '/cpu:0'
         self.dropout_keep = dropout_keep
@@ -106,13 +106,19 @@ class CNN(object):
             self.accuracy = tf.reduce_mean(tf.cast(correct, 'float'), name='accuracy')
 
     # Training process
-    def train(self, dropout, checkpoint_step, batch_size, epoch_num, model_name, version,
-              train_word, train_reg, train_y, dev_word, dev_reg, dev_y):
+    def train(self, dropout, check_step, save_step, batch_size, epoch_num, model_name,
+              train_word, train_reg, train_y,
+              dev_word, dev_reg, dev_y,
+              test_word, test_reg, test_y):
         curr_step = 0
-        batches = dh.batch_iter(list(zip(train_word, train_reg, train_y)), batch_size, epoch_num)
+        batches = dh.batch_iter(list(zip(train_word, train_reg, train_y)), batch_size, epoch_num, True)
         dev_feed_dict = {self.x_word: dev_word,
                          self.x_reg: dev_reg,
                          self.y: dev_y,
+                         self.dropout_keep: dropout}
+        test_feed_dict = {self.x_word: test_word,
+                         self.x_reg: test_reg,
+                         self.y: test_y,
                          self.dropout_keep: dropout}
         sess = tf.InteractiveSession()
         sess.run(tf.initialize_all_variables())
@@ -127,21 +133,18 @@ class CNN(object):
                          self.dropout_keep: dropout}
             self.train_step.run(feed_dict=train_feed_dict)
             curr_step += 1
-            if curr_step % checkpoint_step == 0:
+            if curr_step % check_step == 0:
                 dev_acc = self.accuracy.eval(dev_feed_dict)
                 train_acc = self.accuracy.eval(train_feed_dict)
-                print 'Step %d, Train Accuracy: %.3f' % (curr_step, train_acc)
-                print '         Test Accuracy: ', dev_acc
-        acc = self.accuracy.eval(dev_feed_dict)
-        pred = self.prediction.eval(dev_feed_dict)
-        export_model_path = './export/%s' % model_name
-        if self.device == '/cpu:0':
-            saver = tf.train.Saver(tf.global_variables())
-            model_exporter = exporter.Exporter(saver)
-            named_tensor_binding = {"input_x": self.x_word, "input_reg": self.x_reg,
-                                    "classes": self.prediction, "scores": self.probs}
-            signature = exporter.generic_signature(named_tensor_binding)
-            signatures = {"generic": signature}
-            model_exporter.init(sess.graph.as_graph_def(), named_graph_signatures=signatures)
-            model_exporter.export(export_model_path, tf.constant(version), sess)
-        return acc, pred
+                print 'Step %d, Train Accuracy: %.03f' % (curr_step, train_acc)
+                print '          Dev Accuracy: %.03f'% dev_acc
+                if curr_step % save_step == 0:
+                    save_model_path = "./save/model_%d_devacc_%.3f.ckpt" % (curr_step/save_step, dev_acc)
+                    saver = tf.train.Saver(tf.global_variables())
+                    saver_path = saver.save(sess, save_model_path)
+        test_acc = self.accuracy.eval(test_feed_dict)
+        save_model_path = "./save/model_testacc_%.3f.ckpt" % test_acc
+        saver = tf.train.Saver(tf.global_variables())
+        saver_path = saver.save(sess, save_model_path)
+        print 'Save model to %s' % saver_path
+        return dev_acc, test_acc
