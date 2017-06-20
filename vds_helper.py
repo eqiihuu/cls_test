@@ -1,10 +1,11 @@
 # coding=utf-8
 
-import os
+import codecs
 import random
 import json
 from utils import vds_caller as vc
 
+VDS_LENGTH = 12
 
 # Function:
 #     Get the cache file for VDS of [data_path]
@@ -93,7 +94,7 @@ def get_taglist(data_path):
                     if tag not in tag_list:
                         tag_list.append(tag)
         except Exception as ex:
-            print 'error'
+            print 'Error'
 
     f = open('tag2id_list.txt', 'w')
     items = tag_dict.items()
@@ -169,13 +170,13 @@ def read_list(file_path):
 
 
 # Function:
-#     Add VDS features (valid_tag) to data_path
+#     Add VDS sentence-level features (valid_tag) to data_path
 # Input:
 #     data_path: path of the data to be read
 #     data_set: which set to process (train/dev/test)
 # Output: (no return value)
 #     Save the new data to a new file
-def add_vds(data_path, data_set):
+def add_sentence_vds(data_path, data_set):
     f = open(data_path)
     lines = f.readlines()
     f.close()
@@ -206,12 +207,110 @@ def add_vds(data_path, data_set):
     print 'Number of sentences with vde feature: ', index
 
 
+# Function:
+#     Get the mapping file between all words and their tags
+# Input:
+#     data_path: the path of raw input data
+# Output: (No return value)
+#     Save the mapping between each word and its tags into a file
+def get_word2tag_map(data_path):
+    longest = 0
+    word_dict = {}
+    f = open(data_path)
+    lines = f.readlines()
+    f.close()
+    f = codecs.open('word2tag.txt', 'w', encoding='utf-8')
+    for line in lines:
+        domain = line.split('\t')[0]
+        sentence = line.split('\t')[1]
+        sentence = unicode(sentence.replace(' ', ''), 'utf-8')
+        qa_json = vc.get_anno_json(sentence, domain)
+        # print qa_json
+        try:
+            tags = ''
+            anno = qa_json['debug']['VD_tag_debug_info']['VD_tag_resp']['annotation']
+            for i in anno:
+                raw_str = i['raw_str']
+                if 'valid_data_type' in i['value']:
+                    tag = i['value']['valid_data_type']
+                    if not word_dict.has_key(raw_str):
+                        word_dict[raw_str] = [tag, ]
+                        # print raw_str,tag
+                    elif tag not in word_dict[raw_str]:
+                        word_dict[raw_str].append(tag)
+                        # print raw_str, tag
+        except Exception:
+            print 'Warning: Can\'t find VDS for %s' % raw_str
+    items = word_dict.items()
+    for item in items:
+        longest = max(longest, len(item[1]))
+        line = item[0] + '\t'
+        # print item
+        for i in range(0, len(item[1])):
+            line = line + item[1][i]+' '
+        # print line
+        line = line[:-1]+'\n'
+        f.write(line)
+    f.close()
+    print longest
+
+
+# Function:
+#     Add VDS word-level features (valid_tag) to data_path
+# Input:
+#     map_path: path of the word2tag mapping file
+#     tag_path: path of the tag-id mapping file
+# Output:
+#     word2tag_dict: the word-tag mapping dictionary
+#     each key is a word(raw_str) and the value is a list of its tags
+def read_word2tag(word_path, tag_path):
+    word2tag_dict = {}
+    word2tagid_dict = {}
+    tag2id_dict, id2tag_list = read_tag2id(tag_path)
+    f = open(word_path)
+    lines = f.readlines()
+    f.close()
+    for line in lines:
+        raw_str = line.split('\t')[0]
+        tags = line.split('\t')[1]
+        tag_list = tags.split(' ')
+        word2tag_dict[raw_str] = tag_list
+        word2tagid_dict[raw_str] = []
+        for tag in tag_list:
+            tagid = tag2id_dict[tag]
+            word2tagid_dict[raw_str].append(tagid)
+        for i in range(len(tag_list, VDS_LENGTH)):
+            word2tag_dict[raw_str].append('NULL')
+            word2tagid_dict[raw_str].append(0)
+    return word2tag_dict, word2tagid_dict
+
+
+# Function:
+#     Read the tag2id mapping file
+# Input:
+#     tag_path: path of the file that contains all the tags
+# Output:
+#      tag2id_dict: the dictionary that maps all tags to ids
+#      id2tag_list: the list of all tags
+def read_tag2id(tag_path):
+    tag2id_dict = {'NULL': 0}
+    id2tag_list = ['NULL', ]
+    f = open(tag_path)
+    lines = f.readlines()
+    f.close()
+    for i in range(len(lines)):
+        line = lines[i]
+        tag = line.split(' ')[1]
+        tag2id_dict[tag] = i+1
+        id2tag_list.append(tag)
+    return tag2id_dict, id2tag_list
+
 if __name__ == '__main__':
-    data_set = 'train'
+    data_set = 'all'
     data_path = '/home/qihu/PycharmProjects/cls_test/data/nlu.' +data_set+ '.string.cnn_format'
     # analyse(data_path)  # get the tag list of data
     # split_data(data_path, 0.5)
     # get_taglist(data_path)
     # analyse(data_path)
     # get_combine('tag2id_list')
-    add_vds(data_path, data_set)
+    get_word2tag_map(data_path)

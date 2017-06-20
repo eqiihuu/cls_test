@@ -5,6 +5,7 @@ import random
 import os
 import codecs
 
+VDS_LENGTH = 12
 UNK = 'NULL'
 ZERO = 'ZERO'
 UNK_REG = 'N/A'
@@ -13,17 +14,17 @@ sentence_length = None
 reg_length = None
 
 
+# Function:
+#     Find the word in word2vec 300 table
 def read_word_lookup_table(lookup_table_file):
-    # Find the word in word2vec 300 table
     lt = []
     word2id = {}
-    # for zero padding
+    # Zero padding
     word2id[ZERO] = 0
     lt.append([0 for _ in range(embedding_size)])
-    # for zero padding
+    # # Random padding
     # word2id[UNK] = 0
     # lt.append([random.random() for _ in range(embedding_size)])
-
     f = open(lookup_table_file, 'r')
     f.readline()
     for line in f:
@@ -39,9 +40,66 @@ def read_word_lookup_table(lookup_table_file):
 
     f.close()
     id2word = {v: k for k, v in word2id.items()}
-    return (lt, word2id, id2word)
+    return lt, word2id, id2word
 
 
+# Function:
+#     Add VDS word-level features (valid_tag) to data_path
+# Input:
+#     map_path: path of the word2tag mapping file
+#     tag_path: path of the tag-id mapping file
+# Output:
+#     word2tag_dict: the word-tag mapping dictionary
+#     each key is a word(raw_str) and the value is a list of its tags
+def read_word2tag(word_path, tag_path):
+    word2tag_dict = {}
+    word2tagid_dict = {}
+    word2id = {}
+    id2tagvect = []
+    tag2id_dict, id2tag_list = read_tag2id(tag_path)
+    f = open(word_path)
+    lines = f.readlines()
+    f.close()
+    for i in range(len(lines)):
+        line = lines[i]
+        raw_str = unicode(line.split('\t')[0], 'utf-8')
+        tags = line.split('\t')[1].strip('\n')
+        tag_list = tags.split(' ')
+        for j in range(len(tag_list), VDS_LENGTH):
+            tag_list.append('NULL')
+        word2tag_dict[raw_str] = tag_list
+        word2tagid_dict[raw_str] = []
+        word2id[raw_str] = i
+        for tag in tag_list:
+            tagid = tag2id_dict[tag]
+            word2tagid_dict[raw_str].append(tagid)
+        id2tagvect.append(word2tagid_dict[raw_str])
+    return word2id, word2tagid_dict, id2tagvect
+
+
+# Function:
+#     Read the tag2id mapping file
+# Input:
+#     tag_path: path of the file that contains all the tags
+# Output:
+#      tag2id_dict: the dictionary that maps all tags to ids
+#      id2tag_list: the list of all tags
+def read_tag2id(tag_path):
+    tag2id_dict = {'NULL': 0}
+    id2tag_list = ['NULL']
+    f = open(tag_path)
+    lines = f.readlines()
+    f.close()
+    for i in range(len(lines)):
+        line = lines[i]
+        tag = line.split(' ')[1]
+        tag2id_dict[tag] = i+1
+        id2tag_list.append(tag)
+    return tag2id_dict, id2tag_list
+
+
+# Function:
+#     Read label
 def read_label(label_id_file):
     label_id = {}
     id_to_label = []
@@ -52,7 +110,27 @@ def read_label(label_id_file):
         label_id[line] = V
         id_to_label.append(line)
         V += 1
-    return (label_id, id_to_label)
+    return label_id, id_to_label
+
+
+# Function:
+#     Read data
+def read_data(feature_file, label2id, word2id, reg2id, word2tagid):
+    utterances = []
+    vds = []
+    regs = []
+    y = []
+    # print word2id
+    with open(feature_file, 'r') as f:
+        for line in f:
+            line = line.strip().decode('utf-8')
+            line = line.split('\t')
+            y.append(encode_y(line[0], label2id))
+            utterances.append(encode_sentence(line[1], word2id))
+            vds.append(encode_vds(line[1], word2tagid))
+            regs.append(encode_and_record_reg(line[2], reg2id))
+        # print vds
+    return utterances, vds, regs, y
 
 
 def encode_sentence(sent, word2id):
@@ -68,7 +146,7 @@ def encode_sentence(sent, word2id):
     return unigrams
 
 
-def encode_and_record_reg(reg_str, reg2id, id2reg):
+def encode_and_record_reg(reg_str, reg2id):
     reg_tags = reg_str.split(' ')
     reg_ids = np.zeros(shape=[reg_length])
     for i in range(len(reg_tags)):
@@ -78,7 +156,6 @@ def encode_and_record_reg(reg_str, reg2id, id2reg):
             reg_ids[i] = reg2id[reg_tags[i]]
         else:
             reg2id[reg_tags[i]] = len(reg2id)
-            id2reg.append(reg_tags[i])
             reg_ids[i] = reg2id[reg_tags[i]]
     return reg_ids
 
@@ -102,65 +179,21 @@ def encode_y(task, label2id):
     return tmp
 
 
-def read_train(feature_file, label2id, word2id):
-    utterances = []
-    regs = []
-    early_stops = []
-    y = []
-
-    reg2id = {}
-    id2reg = []
-    reg2id[UNK_REG] = 0
-    id2reg.append(UNK_REG)
-
-    with open(feature_file,'r') as f:
-        for line in f:
-            line = line.strip().decode('utf-8')
-            line = line.split('\t')
-
-            y.append(encode_y(line[0], label2id))
-            early_stops.append( min(len(line[1].split(" ")), sentence_length))
-            utterances.append(encode_sentence(line[1], word2id))
-            regs.append(encode_and_record_reg(line[2], reg2id, id2reg))
-
-    logging.info("regex size: {}".format(len(reg2id)))
-    return (utterances,early_stops,regs,y,reg2id,id2reg)
+def encode_vds(sent, word2tagid):
+    words = sent.split(" ")
+    tags = np.zeros(shape=[sentence_length])
+    for i in range(len(words)):
+        if i >= sentence_length:
+            break
+        if word2tagid.has_key(words[i]):
+            tags[i] = word2tagid[words[i]]
+        else:
+            tags[i] = word2tagid[UNK]
+    return tags
 
 
-def read_dev(feature_file, label2id, word2id, reg2id):
-    utterances = []
-    regs = []
-    y = []
-
-    with open(feature_file,'r') as f:
-        for line in f:
-            line = line.strip().decode('utf-8')
-            line = line.split('\t')
-
-            y.append(encode_y(line[0], label2id))
-            utterances.append(encode_sentence(line[1],word2id))
-            regs.append(encode_reg(line[2], reg2id))
-
-    return (utterances, regs, y)
-
-
-def export(export_dir,word2id,reg2id,label2id):
-  logging.info("saving vocab.dir")
-  with codecs.open(os.path.join(export_dir,"vocab.dir"),'w','utf-8') as f:
-    f.write(u"{0} {1}\n".format(word2id[UNK],sentence_length))
-    for key,value in word2id.items():
-        f.write(u"{0} {1}\n".format(key,value))
-  logging.info("saving reg.dir")
-  with codecs.open(os.path.join(export_dir,"reg.dir"),'w','utf-8') as f:
-    f.write(u"{0} {1}\n".format(reg2id[UNK_REG],reg_length))
-    for key,value in reg2id.items():
-        f.write(u"{0} {1}\n".format(key,value))
-  logging.info("saving label.dir")
-  with codecs.open(os.path.join(export_dir,"label.dir"),'w','utf-8') as f:
-    for key,value in label2id.items():
-        f.write(u"{0} {1}\n".format(key,value))
-
-
+# Function:
+#     Get the batch data & label
 def batch_iter(data, batch_size, num_epochs, shuffle=True):
     data = np.array(data)
     data_size = len(data)
@@ -176,26 +209,3 @@ def batch_iter(data, batch_size, num_epochs, shuffle=True):
             start_index = batch_num * batch_size
             end_index = min((batch_num + 1) * batch_size, data_size)
             yield shuffled_data[start_index:end_index]
-
-
-def dump_to_pkl(obj,fname):
-    logging.info("writing to pkl")
-    with open(fname,'wb') as f:
-        np.pickle.dump(obj, f)
-
-
-def load_from_pkl(fname):
-    logging.info("loading from  pkl")
-    with open(fname,'rb') as f:
-        return np.pickle.load(f)
-
-
-def extract_dev_diff(dev_file, predictions, id2label, out_file):
-    with open(dev_file) as input, codecs.open(out_file, "w", encoding="utf-8") as out:
-      for line, pre in zip(input, predictions):
-        line = line.strip().decode('utf-8')
-        l = line.split('\t')
-
-        id = pre.astype(np.int64)
-        if l[0] != id2label[id]:
-            out.write(line + u"\t" + id2label[id] + u"\n")
