@@ -43,6 +43,16 @@ def get_annotations(query, domain):
     return []
 
 
+# Return the QA result in json format
+def get_anno_json(query, domain):
+  try:
+      qa_json = call_qa_with_debug(query, domain)
+      return qa_json
+  except Exception as ex:
+    print "[ERROR] error to get QA JSON: " + str(ex)
+    return []
+
+
 def match(vd_annotations, start_index, end_index):
   matched_annos = []
   for anno in vd_annotations:
