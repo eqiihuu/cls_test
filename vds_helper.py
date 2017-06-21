@@ -3,9 +3,11 @@
 import codecs
 import random
 import json
+import numpy as np
 from utils import vds_caller as vc
 
 VDS_LENGTH = 12
+VDS_SIZE = 308
 
 # Function:
 #     Get the cache file for VDS of [data_path]
@@ -286,6 +288,8 @@ def read_word2tag(word_path, tag_path):
 
 # Function:
 #    Add the VDS feature to each query
+#      Each word may have multiple VDS tags, and these tags are separated by ' '
+#      Different words are separated by '|'
 # Input:
 # Output:
 def add_word_vds(data_path, tag2id_path):
@@ -301,9 +305,6 @@ def add_word_vds(data_path, tag2id_path):
         sentence = line.split('\t')[1]
         words = sentence.split(' ')
         tag_dict = {}
-        for word in words:
-            word = unicode(word, 'utf-8')
-            tag_dict[word] = []
         sentence = unicode(sentence.replace(' ', ''), 'utf-8')
         qa_json = vc.get_anno_json(sentence, domain)
         # print qa_json
@@ -313,7 +314,11 @@ def add_word_vds(data_path, tag2id_path):
                 if 'valid_data_type' in i['value']:
                     tag = i['value']['valid_data_type']
                     raw_str = i['raw_str']
-                    tag_dict[raw_str].append(tag)
+                    if tag_dict.has_key(raw_str):
+                        if tag not in tag_dict[raw_str]:
+                            tag_dict[raw_str].append(tag)
+                    else:
+                        tag_dict[raw_str] = [tag, ]
             index += 1
             print sentence
         except Exception:
@@ -322,17 +327,22 @@ def add_word_vds(data_path, tag2id_path):
         tag_line = unicode(line[:-1] + '\t', 'utf-8')
         id_line = unicode(line[:-1] + '\t', 'utf-8')
         for word in words:
-            tags = ''
-            ids = ''
             word = unicode(word, 'utf-8')
-            for tag in tag_dict[word]:
-                id = str(tag2id_dict[tag])
-                ids = ids + id + '|'
-                tags = tags + tag + '|'
-            ids = ids[:-1]
-            tags = tags[:-1]
-            tag_line = tag_line + tags + ' '
-            id_line = id_line + ids + ' '
+            if tag_dict.has_key(word):
+                tags = ''
+                ids = ''
+                for t in tag_dict[word]:
+                    tid = str(tag2id_dict[t])
+                    ids = ids + tid + ' '
+                    tags = tags + t + ' '
+                ids = ids[:-1]
+                tags = tags[:-1]
+            else:
+                ids = '0'
+                tags = 'NULL'
+
+            tag_line = tag_line + tags + '|'
+            id_line = id_line + ids + '|'
         tag_line = tag_line[:-1]+'\n'
         id_line = id_line[:-1]+'\n'
         f1.write(tag_line)
@@ -341,6 +351,61 @@ def add_word_vds(data_path, tag2id_path):
     f1.close()
     f2.close()
 
+
+# Function:
+#    Add the VDS feature id (multihot) to each query
+#      Each word may have multiple VDS tags, and these tags are separated by ' '
+#      Different words are separated by '|'
+# Input:
+# Output:
+def add_word_vds_multihot(data_path, tag2id_path):
+    tag2id_dict, id2tag_list = read_tag2id(tag2id_path)
+    f = open(data_path)
+    lines = f.readlines()
+    f.close()
+    f = codecs.open('data_vds_id_multihot_' + data_set, 'w', encoding='utf-8')
+    index = 0
+    for line in lines:
+        domain = line.split('\t')[0]
+        sentence = line.split('\t')[1]
+        words = sentence.split(' ')
+        tag_dict = {}
+        sentence = unicode(sentence.replace(' ', ''), 'utf-8')
+        qa_json = vc.get_anno_json(sentence, domain)
+        try:
+            anno = qa_json['debug']['VD_tag_debug_info']['VD_tag_resp']['annotation']
+            for i in anno:
+                if 'valid_data_type' in i['value']:
+                    tag = i['value']['valid_data_type']
+                    raw_str = i['raw_str']
+                    if tag_dict.has_key(raw_str):
+                        if tag not in tag_dict[raw_str]:
+                            tag_dict[raw_str].append(tag)
+                    else:
+                        tag_dict[raw_str] = [tag, ]
+            index += 1
+            print sentence
+        except Exception:
+            print 'Error'
+        tag_line = unicode(line[:-1] + '\t', 'utf-8')
+        id_line = unicode(line[:-1] + '\t', 'utf-8')
+        for word in words:
+            word = unicode(word, 'utf-8')
+            ids = ''
+            id_multihot = np.zeros(VDS_SIZE)
+            if tag_dict.has_key(word):
+                for t in tag_dict[word]:
+                    tid = tag2id_dict[t]
+                    id_multihot[tid] = 1
+            else:
+                id_multihot[0] = 1
+            for i in range(VDS_SIZE):
+                 id_line = id_line + str(int(id_multihot[i])) + ' '
+            id_line = id_line + '|'
+        id_line = id_line[:-1]+'\n'
+        f.write(id_line)
+    print index
+    f.close()
 
 
 # Function:
@@ -366,7 +431,7 @@ def read_tag2id(tag_path):
 
 
 if __name__ == '__main__':
-    data_set = 'dev'
+    data_set = 'train'
     data_path = '/home/qihu/PycharmProjects/cls_test/data/nlu.' +data_set+ '.string.cnn_format'
     # analyse(data_path)  # get the tag list of data
     # split_data(data_path, 0.5)
@@ -374,4 +439,4 @@ if __name__ == '__main__':
     # analyse(data_path)
     # get_combine('tag2id_list')
     # get_word2tag_map(data_path)
-    add_word_vds(data_path, '/home/qihu/PycharmProjects/cls_test/data/tag2id_list_all.txt')
+    add_word_vds_multihot(data_path, '/home/qihu/PycharmProjects/cls_test/data/tag2id_list_all.txt')

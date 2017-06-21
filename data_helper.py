@@ -6,6 +6,8 @@ import os
 import codecs
 
 VDS_LENGTH = 12
+VDS_SIZE = 308
+
 UNK = 'NULL'
 ZERO = 'ZERO'
 UNK_REG = 'N/A'
@@ -115,7 +117,7 @@ def read_label(label_id_file):
 
 # Function:
 #     Read data
-def read_data(feature_file, label2id, word2id, reg2id, word2tagid):
+def read_data(feature_file, label2id, word2id, reg2id):
     utterances = []
     vds = []
     regs = []
@@ -127,7 +129,7 @@ def read_data(feature_file, label2id, word2id, reg2id, word2tagid):
             line = line.split('\t')
             y.append(encode_y(line[0], label2id))
             utterances.append(encode_sentence(line[1], word2id))
-            vds.append(encode_vds(line[1], word2tagid))
+            vds.append(encode_vds(line[3]))
             regs.append(encode_and_record_reg(line[2], reg2id))
         # print vds
     return utterances, vds, regs, y
@@ -179,16 +181,17 @@ def encode_y(task, label2id):
     return tmp
 
 
-def encode_vds(sent, word2tagid):
-    words = sent.split(" ")
-    tags = np.zeros(shape=[sentence_length])
+def encode_vds(vds_str):
+    words = vds_str.split('|')
+    tags = np.zeros(shape=[sentence_length, VDS_SIZE])-1
     for i in range(len(words)):
         if i >= sentence_length:
             break
-        if word2tagid.has_key(words[i]):
-            tags[i] = word2tagid[words[i]]
-        else:
-            tags[i] = word2tagid[UNK]
+        tids = words[i].split(' ')
+        for j in tids:
+            j = int(j)
+            tags[i, j] = 1
+    # print tags.shape
     return tags
 
 
