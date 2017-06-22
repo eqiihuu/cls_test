@@ -14,8 +14,8 @@ def train_cnn():
     batch_size = 100
     learning_rate = 0.001
     check_step = 300
-    save_step = 300
-    epoch_num = 1
+    save_step = 900
+    epoch_num = 40
     gpu = 0
     model_name = 'model.cnn'
     word_lookup_file = './data/word_vectors_pruned_300.txt'
@@ -27,6 +27,11 @@ def train_cnn():
     sentence_length = 20
     reg_length = 8
     word_embed = 300
+    vds_embed = 308
+    reg_embed = 250
+    filter_size = 3
+    filter_num = 64
+
     dh.embedding_size = word_embed
     dh.reg_length = reg_length
     dh.sentence_length = sentence_length
@@ -43,12 +48,13 @@ def train_cnn():
     dev_word, dev_vds, dev_reg, dev_y = dh.read_data(dev_feature_file, label2id, word2id, reg2id)
     test_word, test_vds, test_reg, test_y = dh.read_data(test_feature_file, label2id, word2id, reg2id)
 
-    vbs_size = 308
+    vds_size = 308
     vocab_size = len(word2id)
     reg_size = len(reg2id)
     num_class = len(label2id)
 
-    cnn = CNN(num_class, id2vect, gpu, l2_reg, dropout, learning_rate, vocab_size, vbs_size, reg_size)
+    cnn = CNN(num_class, id2vect, gpu, l2_reg, learning_rate, vocab_size, vds_size, reg_size,
+              sentence_length, word_embed, vds_embed, reg_embed, filter_size, filter_num)
     print 'Start Training'
     max_devacc, step_max_devacc, root_path = cnn.train(dropout, check_step, save_step, batch_size, epoch_num, model_name,
                                   train_word, train_vds, train_reg, train_y,
@@ -56,7 +62,6 @@ def train_cnn():
                                   test_word, test_vds, test_reg, test_y)
     print('Dev accuracy: %.3f' % max_devacc)
     return root_path, step_max_devacc, max_devacc
-
 
 if __name__ == '__main__':
     train_cnn()

@@ -7,6 +7,7 @@ import codecs
 
 VDS_LENGTH = 12
 VDS_SIZE = 308
+REG_SIZE = 166
 
 UNK = 'NULL'
 ZERO = 'ZERO'
@@ -130,7 +131,7 @@ def read_data(feature_file, label2id, word2id, reg2id):
             y.append(encode_y(line[0], label2id))
             utterances.append(encode_sentence(line[1], word2id))
             vds.append(encode_vds(line[3]))
-            regs.append(encode_and_record_reg(line[2], reg2id))
+            regs.append(encode_and_multihot_reg(line[2], reg2id))
         # print vds
     return utterances, vds, regs, y
 
@@ -148,17 +149,16 @@ def encode_sentence(sent, word2id):
     return unigrams
 
 
-def encode_and_record_reg(reg_str, reg2id):
+def encode_and_multihot_reg(reg_str, reg2id):
     reg_tags = reg_str.split(' ')
-    reg_ids = np.zeros(shape=[reg_length])
+    reg_ids = np.zeros(shape=[REG_SIZE])
     for i in range(len(reg_tags)):
-        if i >= reg_length:
-            break
         if reg_tags[i] in reg2id:
-            reg_ids[i] = reg2id[reg_tags[i]]
+            index = reg2id[reg_tags[i]]
+            reg_ids[index] = 1
         else:
             reg2id[reg_tags[i]] = len(reg2id)
-            reg_ids[i] = reg2id[reg_tags[i]]
+            reg_ids[len(reg2id)-1] = 1
     return reg_ids
 
 
