@@ -11,8 +11,8 @@ __email__ = 'qihu@mobvoi.com'
 class CNN(object):
     # Define the model
     reg = 1
-    word = 1  # Use the raw word
-    vds = 1  # Use the VDS feature (1 for multi-hot vector, 2 for 12D vecter)
+    word = 0  # Use the raw word
+    vds = 0  # Use the VDS feature (1 for multi-hot vector, 2 for 12D vecter)
 
     def __init__(self,
                  num_class,  # number of sentence classes 51
@@ -35,16 +35,12 @@ class CNN(object):
 
             self.x_word = tf.placeholder(tf.int32, shape=(None, sentence_length))
             self.x_vds = tf.placeholder(tf.float32, shape=(None, sentence_length, vds_size))
-            self.x_reg = tf.placeholder(tf.int32, shape=(None, reg_length))
+            self.x_reg = tf.placeholder(tf.float32, shape=(None, reg_length))
             self.y = tf.placeholder(tf.float32, shape=(None, num_class))
 
             # RegEx
-            W_reg = tf.Variable(tf.random_uniform([reg_size, reg_embed], -1.0, 1.0))
-            reg_vec = tf.nn.embedding_lookup(W_reg, self.x_reg)
-            self.reg_norm = tf.reduce_max(reg_vec, 1)
-            self.reg_drop = tf.nn.dropout(self.reg_norm, self.dropout_keep)
             # Merge word, vds features and RegEx features
-            self.feature = self.reg_drop
+            self.feature = self.x_reg
 
             if self.word == 1:
                 # Embedding layer for words
@@ -97,11 +93,9 @@ class CNN(object):
                                           )
                 self.pool_vds_flat = tf.reshape(pool_vds, [-1, filter_num])
                 self.feature = tf.concat([self.pool_vds_flat, self.feature], 1)
-            # Dropout layer
-            self.drop = tf.nn.dropout(self.feature, self.dropout_keep)
 
             # Score and prediction
-            W_f = tf.Variable(tf.constant(0.0, shape=[(self.vds+self.word)*filter_num+reg_embed, num_class]), name='W_f')
+            W_f = tf.Variable(tf.constant(0.0, shape=[(self.vds+self.word)*filter_num+reg_length, num_class]), name='W_f')
             b_f = tf.Variable(tf.constant(0.0, shape=[num_class]), name='b_f')
             l2_loss = tf.nn.l2_loss(W_f) + tf.nn.l2_loss(b_f)
             self.score = tf.nn.xw_plus_b(self.feature, W_f, b_f, name='score')
@@ -114,8 +108,8 @@ class CNN(object):
             self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
 
             # Accuracy
-            self.y_index = tf.argmax(self.y, 1)
-            correct = tf.equal(self.prediction, self.y_index)
+            y_index = tf.argmax(self.y, 1)
+            correct = tf.equal(self.prediction, y_index)
             self.accuracy = tf.reduce_mean(tf.cast(correct, 'float'), name='accuracy')
 
             self.init = tf.global_variables_initializer()
@@ -124,10 +118,8 @@ class CNN(object):
     def train(self, dropout, check_step, save_step, batch_size, epoch_num, model_name,
               train_word, train_vds, train_reg, train_y,
               dev_word, dev_vds, dev_reg, dev_y,
-              test_word, test_vds, test_reg, test_y,
-              id2label):
+              test_word, test_vds, test_reg, test_y):
         root_path = './save/%d_%d_%d/' % (self.word, self.vds, time.time())
-        print 'ROOT_PATH: %s' % root_path
         os.mkdir(root_path)
         curr_step = 0
         batches = dh.batch_iter(list(zip(train_word, train_vds, train_reg, train_y)), batch_size, epoch_num, True)
@@ -135,11 +127,6 @@ class CNN(object):
                          self.x_vds: dev_vds,
                          self.x_reg: dev_reg,
                          self.y: dev_y,
-                         self.dropout_keep: 1.0}
-        test_feed_dict = {self.x_word: test_word,
-                         self.x_vds: test_vds,
-                         self.x_reg: test_reg,
-                         self.y: test_y,
                          self.dropout_keep: 1.0}
         sess = tf.InteractiveSession()
         sess.run(self.init)
@@ -155,48 +142,14 @@ class CNN(object):
                                self.x_reg: reg_batch,
                                self.y: y_batch,
                                self.dropout_keep: dropout}
-            t0 = time.time()
             self.train_step.run(feed_dict=train_feed_dict)
             # print 'Step %d, %s' % (curr_step, time.time())
             curr_step += 1
             if curr_step % check_step == 0:
-                t1 = time.time()
                 dev_acc = self.accuracy.eval(dev_feed_dict)
-                test_acc = self.accuracy.eval(test_feed_dict)
-                t2 = time.time()
                 train_acc = self.accuracy.eval(train_feed_dict)
-                t3 = time.time()
-                print 'Step %d, Train: %.3f' % (curr_step, train_acc)
-                print '          Dev Accuracy: %.3f' % dev_acc
-                print '          Test Accuracy: %.3f' % test_acc
-                # # Show the time consumption
-                # print '%f, %f, %f, %f' % (t0, t1, t2, t3)
-                # print '          Speed: %f' % ((float(t2)-float(t1))/4917.0)
-                # Write the prediction on dev set to a file
-                prediction = self.prediction.eval(dev_feed_dict)
-                groundTruth = self.y_index.eval(dev_feed_dict)
-                # print prediction[0]
-                f = open(root_path+'predict_dev_%d' % curr_step, 'w')
-                for i in range(len(dev_y)):
-                    gt = int(groundTruth[i])
-                    pred = int(prediction[i])
-                    gt_label = id2label[gt]
-                    pred_label = id2label[pred]
-                    f.write('%s\t%s\n' % (gt_label, pred_label))
-                f.close()
-
-                prediction = self.prediction.eval(test_feed_dict)
-                groundTruth = self.y_index.eval(test_feed_dict)
-                # print prediction[0]
-                f = open(root_path+'predict_test_%d' % curr_step, 'w')
-                for i in range(len(dev_y)):
-                    gt = int(groundTruth[i])
-                    pred = int(prediction[i])
-                    gt_label = id2label[gt]
-                    pred_label = id2label[pred]
-                    f.write('%s\t%s\n' % (gt_label, pred_label))
-                f.close()
-
+                print 'Step %d, Train: %.03f' % (curr_step, train_acc)
+                print '          Dev Accuracy: %.03f' % dev_acc
                 if curr_step % save_step == 0:
                     save_model_path = os.path.join(root_path, "model_%d_devacc_%.3f" % (curr_step, dev_acc))
                     saver = tf.train.Saver(tf.global_variables())

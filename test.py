@@ -49,4 +49,4 @@ def test_cnn(root_path, step_max_devacc, max_devacc):
 
 if __name__ == '__main__':
     root_path, step_max_devacc, max_devacc = train_cnn()
-    # test_cnn(root_path, step_max_devacc, max_devacc)
+    test_cnn(root_path, step_max_devacc, max_devacc)

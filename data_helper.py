@@ -6,7 +6,7 @@ import os
 import codecs
 
 VDS_LENGTH = 12
-VDS_SIZE = 308
+vds_size = None
 REG_SIZE = 166
 
 UNK = 'NULL'
@@ -130,8 +130,8 @@ def read_data(feature_file, label2id, word2id, reg2id):
             line = line.split('\t')
             y.append(encode_y(line[0], label2id))
             utterances.append(encode_sentence(line[1], word2id))
-            vds.append(encode_vds(line[3]))
-            regs.append(encode_and_multihot_reg(line[2], reg2id))
+            vds.append(encode_multihot_vds(line[3]))
+            regs.append(encode_and_record_reg(line[2], reg2id))
         # print vds
     return utterances, vds, regs, y
 
@@ -162,6 +162,20 @@ def encode_and_multihot_reg(reg_str, reg2id):
     return reg_ids
 
 
+def encode_and_record_reg(reg_str, reg2id):
+    reg_tags = reg_str.split(' ')
+    reg_ids = np.zeros(shape=[reg_length])
+    for i in range(len(reg_tags)):
+        if i >= reg_length:
+            break
+        if reg_tags[i] in reg2id:
+            reg_ids[i] = reg2id[reg_tags[i]]
+        else:
+            reg2id[reg_tags[i]] = len(reg2id)
+            reg_ids[i] = reg2id[reg_tags[i]]
+    return reg_ids
+
+
 def encode_reg(reg_str, reg2id):
     reg_tags = reg_str.split(" ")
     reg_ids = np.zeros(shape=[reg_length])
@@ -183,14 +197,31 @@ def encode_y(task, label2id):
 
 def encode_vds(vds_str):
     words = vds_str.split('|')
-    tags = np.zeros(shape=[sentence_length, VDS_SIZE])-1
+    tags = np.zeros(shape=[sentence_length, VDS_LENGTH])
+    for i in range(len(words)):
+        if i >= sentence_length:
+            break
+        tids = words[i].split(' ')
+        for j in range(len(tids)):
+            index = int(tids[j])
+            tags[i, j] = index
+    # print tags.shape
+    return tags
+
+
+def encode_multihot_vds(vds_str):
+    words = vds_str.split('|')
+    tags = np.zeros(shape=[sentence_length, vds_size])
     for i in range(len(words)):
         if i >= sentence_length:
             break
         tids = words[i].split(' ')
         for j in tids:
-            j = int(j)
-            tags[i, j] = 1
+            index = int(j)
+            if index >= vds_size:
+                continue
+            else:
+                tags[i, index] = 1
     # print tags.shape
     return tags
 

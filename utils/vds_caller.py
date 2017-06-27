@@ -63,6 +63,9 @@ def match(vd_annotations, start_index, end_index):
   return set([anno.tag for anno in matched_annos])
 
 
+def statistic_data():
+  return 1
+
 if __name__ == '__main__':
   query = u"导航去附近的银行"
   domain = "nlu.navigation"

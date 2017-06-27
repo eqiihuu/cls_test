@@ -176,7 +176,7 @@ class CNN(object):
                 prediction = self.prediction.eval(dev_feed_dict)
                 groundTruth = self.y_index.eval(dev_feed_dict)
                 # print prediction[0]
-                f = open(root_path+'predict_dev_%d' % curr_step, 'w')
+                f = open(root_path+'predict_dev_%d_%d' % (curr_step, int(dev_acc*1000)), 'w')
                 for i in range(len(dev_y)):
                     gt = int(groundTruth[i])
                     pred = int(prediction[i])
@@ -188,7 +188,7 @@ class CNN(object):
                 prediction = self.prediction.eval(test_feed_dict)
                 groundTruth = self.y_index.eval(test_feed_dict)
                 # print prediction[0]
-                f = open(root_path+'predict_test_%d' % curr_step, 'w')
+                f = open(root_path+'predict_test_%d_%d' % (curr_step, int(dev_acc*1000)), 'w')
                 for i in range(len(dev_y)):
                     gt = int(groundTruth[i])
                     pred = int(prediction[i])
