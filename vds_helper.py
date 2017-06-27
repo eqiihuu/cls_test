@@ -1,10 +1,11 @@
-# coding=utf-8
+#  coding=utf-8
 
 import codecs
 import random
 import json
 import numpy as np
-from utils import vds_caller as vc
+import urllib
+# from utils import vds_caller as vc
 
 VDS_LENGTH = 12
 VDS_SIZE = 308
@@ -430,13 +431,48 @@ def read_tag2id(tag_path):
     return tag2id_dict, id2tag_list
 
 
+# Get vds feature online
+def wget_vds(data_path, start, stop, version):
+    f = open(data_path)
+    lines = f.readlines()
+    f.close()
+    f = codecs.open('./data/data_vds_'+str(version)+'_' + data_set, 'w', encoding='utf-8')
+    lines = lines[start:stop]
+    for line in lines:
+        domain = line.split('\t')[0]
+        sentence = line.split('\t')[1]
+        sentence = (sentence.replace(' ', ''))
+        url = 'http://qa-alpha:5670/?query='+urllib.quote(sentence)+'&lang=zh-tw&debug=true&context=contextqa.default'
+        print start, sentence
+        qa_result = urllib.urlopen(url).read()
+        qa_json = json.loads(qa_result)
+        crf_feature_list = qa_json['debug']['Crf_debug_info']['Crf-feature_matrix-List']
+        vd_line = unicode(line[:-1] + '\t', 'utf-8')
+        for i in range(len(crf_feature_list)):
+            features = crf_feature_list[i].split(' ')
+            index = 3
+            if features[3][-2:] != 'VD':
+                for j in range(len(features)):
+                    if features[j][-2:] == 'VD':
+                        index = j
+                        print 'VD is at index: %d' % index
+                        break
+            vd = features[index]
+            vd_line = vd_line + vd + ' '
+        vd_line = vd_line[:-1] + '\n'
+        f.write(vd_line)
+        start += 1
+    f.close()
+
+
 if __name__ == '__main__':
     data_set = 'train'
-    data_path = '/home/qihu/PycharmProjects/cls_test/data/nlu.' +data_set+ '.string.cnn_format'
+    data_path = './data/nlu.'+data_set+'.string.cnn_format'
     # analyse(data_path)  # get the tag list of data
     # split_data(data_path, 0.5)
     # get_taglist(data_path)
     # analyse(data_path)
     # get_combine('tag2id_list')
     # get_word2tag_map(data_path)
-    add_word_vds_multihot(data_path, '/home/qihu/PycharmProjects/cls_test/data/tag2id_list_all.txt')
+    # add_word_vds_multihot(data_path, '/home/qihu/PycharmProjects/cls_test/data/tag2id_list_all.txt')
+    wget_vds(data_path, 40000, 40000, 3)
