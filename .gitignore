@@ -3,3 +3,4 @@ save
 .idea
 *.pyc
 *.txt
+zhennan/*.cnn_format

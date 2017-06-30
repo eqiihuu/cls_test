@@ -11,8 +11,8 @@ __email__ = 'qihu@mobvoi.com'
 class CNN(object):
     # Define the model
     reg = 1
-    word = 0  # Use the raw word
-    vds = 0  # Use the VDS feature (1 for multi-hot vector, 2 for 12D vecter)
+    word = 1  # Use the raw word
+    vds = 1  # Use the VDS feature (1 for multi-hot vector, 2 for 12D vecter)
 
     def __init__(self,
                  num_class,  # number of sentence classes 51
@@ -24,7 +24,8 @@ class CNN(object):
                  reg_size=166,  # number of all RegEx 166
                  reg_length=8,
                  sentence_length=20,  # length of a sentence 20
-                 word_embed=20,  # the embedding length of a word 300
+                 word_embed=50,  # the embedding length of a word 300
+                 vds_embed=50,
                  reg_embed=50,
                  filter_size=3,  # size of conv filters
                  filter_num=64  # number of filters for a single filter_size
@@ -34,24 +35,17 @@ class CNN(object):
             self.dropout_keep = tf.placeholder_with_default(tf.constant(1.0), shape=None)
 
             self.x_word = tf.placeholder(tf.int32, shape=(None, sentence_length))
-            self.x_vds = tf.placeholder(tf.float32, shape=(None, sentence_length, vds_size))
+            self.x_vds = tf.placeholder(tf.int32, shape=(None, sentence_length))
             self.x_reg = tf.placeholder(tf.int32, shape=(None, reg_length))
             self.y = tf.placeholder(tf.float32, shape=(None, num_class))
-
-            # RegEx
-            if self.reg == 1:
-                W_reg = tf.Variable(tf.random_uniform([reg_size, reg_embed], -1.0, 1.0))
-                reg_vec = tf.nn.embedding_lookup(W_reg, self.x_reg)
-                self.reg_norm = tf.reduce_max(reg_vec, 1)
-                self.reg_drop = tf.nn.dropout(self.reg_norm, self.dropout_keep)
-                # Merge word, vds features and RegEx features
-                self.feature = self.reg_norm
 
             if self.vds == 1:
                 # self.embeded_vds = tf.nn.xw_plus_b(self.x_vds, W_vds_f, b_vds_f, name='embed_vds')
                 # VDS Convolution layer
-                self.x_vds_expanded = tf.expand_dims(self.x_vds, -1)  # why expanding?
-                filter_shape = [filter_size, vds_size, 1, filter_num]
+                self.embedding_vds = tf.Variable(tf.random_uniform([vds_size, vds_embed], -1.0, 1.0))
+                self.embedded_vds = tf.nn.embedding_lookup(self.embedding_vds, self.x_vds)
+                self.x_vds_expanded = tf.expand_dims(self.embedded_vds, -1)  # why expanding?
+                filter_shape = [filter_size, vds_embed, 1, filter_num]
                 W_vds = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name='W_vds')
                 b_vds = tf.Variable(tf.constant(0.0, shape=[filter_num]), name='b_vds')
                 conv_vds = tf.nn.conv2d(  # convolution operation
@@ -69,13 +63,12 @@ class CNN(object):
                                           name='pool'
                                           )
                 self.pool_vds_flat = tf.reshape(pool_vds, [-1, filter_num])
-                self.feature = tf.concat([self.pool_vds_flat, self.feature], 1)
-                # self.feature = self.pool_vds_flat
+                self.feature = self.pool_vds_flat
 
             if self.word == 1:
                 # Embedding layer for words
-                self.embedding = tf.Variable(tf.random_uniform([vocab_size, word_embed], -1.0, 1.0))
-                self.embedded_word = tf.nn.embedding_lookup(self.embedding, self.x_word)
+                self.embedding_word = tf.Variable(tf.random_uniform([vocab_size, word_embed], -1.0, 1.0))
+                self.embedded_word = tf.nn.embedding_lookup(self.embedding_word, self.x_word)
                 self.embedded_word_expanded = tf.expand_dims(self.embedded_word, -1)  # why expanding?
 
                 # word Convolution layer
@@ -99,6 +92,15 @@ class CNN(object):
                 self.pool_word_flat = tf.reshape(pool_word, [-1, filter_num])
                 self.feature = tf.concat([self.pool_word_flat, self.feature], 1)
                 # print self.feature, self.pool_word_flat
+
+            # RegEx
+            if self.reg == 1:
+                W_reg = tf.Variable(tf.random_uniform([reg_size, reg_embed], -1.0, 1.0))
+                reg_vec = tf.nn.embedding_lookup(W_reg, self.x_reg)
+                self.reg_norm = tf.reduce_max(reg_vec, 1)
+                self.reg_drop = tf.nn.dropout(self.reg_norm, self.dropout_keep)
+                # Merge word, vds features and RegEx features
+                self.feature = tf.concat([self.reg_drop, self.feature], 1)
 
             # Dropout layer
             self.drop = tf.nn.dropout(self.feature, self.dropout_keep)
@@ -179,7 +181,7 @@ class CNN(object):
                 prediction = self.prediction.eval(dev_feed_dict)
                 groundTruth = self.y_index.eval(dev_feed_dict)
                 # print prediction[0]
-                f = open(root_path+'predict_dev_%d_%d' % (curr_step, int(dev_acc*1000)), 'w')
+                f = open(root_path+'predict_dev_%d' % curr_step, 'w')
                 for i in range(len(dev_y)):
                     gt = int(groundTruth[i])
                     pred = int(prediction[i])
@@ -191,7 +193,7 @@ class CNN(object):
                 prediction = self.prediction.eval(test_feed_dict)
                 groundTruth = self.y_index.eval(test_feed_dict)
                 # print prediction[0]
-                f = open(root_path+'predict_test_%d_%d' % (curr_step, int(dev_acc*1000)), 'w')
+                f = open(root_path+'predict_test_%d' % curr_step, 'w')
                 for i in range(len(dev_y)):
                     gt = int(groundTruth[i])
                     pred = int(prediction[i])
