@@ -1,4 +1,4 @@
-# __Domain Classifier __
+# __Domain Classifier__
 
 ___
 ## Author
@@ -8,8 +8,8 @@ ___
 
 ## Introduction
  * This is a NLP machine learning project
- * The function of this model is to clasify a single sentence to a certain domain, for example "I' like some Thai food" 
-   will be classifid to the RESTAURANT domain.
+ * The function of this model is to classify a single sentence to a certain domain, for example "I' like some Thai food" 
+   will be classified to the RESTAURANT domain.
  * Dataset is not included in this project. You can prepare your own data. The format of data should be as follow:
    1. training, testing and validating data are stored separately in 3 files. Each file is composed of multiple lines 
    (Each line is a data sample).
