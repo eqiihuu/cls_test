@@ -20,9 +20,6 @@ def read_word_lookup_table(lookup_table_file):
     # for zero padding
     word2id[ZERO] = 0
     lt.append([0 for _ in range(embedding_size)])
-    # for zero padding
-    # word2id[UNK] = 0
-    # lt.append([random.random() for _ in range(embedding_size)])
 
     f = open(lookup_table_file, 'r')
     f.readline()

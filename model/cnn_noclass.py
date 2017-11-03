@@ -6,7 +6,7 @@ import utils.data_helpers as dh
 
 __author__ = 'qihu'
 __date__ = 'June 17, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 # the vector is randomly initialized each time
 use_gpu = 0  # whether to use GPU

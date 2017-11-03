@@ -7,7 +7,7 @@ import data_helper as dh
 
 __author__ = 'qihu'
 __date__ = 'June 16, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 
 class CNN(object):

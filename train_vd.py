@@ -2,7 +2,7 @@
 
 import numpy as np
 
-import data_helper as dh
+import utils.data_helpers as dh
 from model.cnn_vd import CNN
 
 __author__ = 'Qi Hu'

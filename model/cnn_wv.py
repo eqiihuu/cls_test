@@ -5,7 +5,7 @@ import data_helper as dh
 
 __author__ = 'qihu'
 __date__ = 'June 16, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 
 class CNN(object):
@@ -146,7 +146,6 @@ class CNN(object):
                                self.y: y_batch,
                                self.dropout_keep: dropout}
             self.train_step.run(feed_dict=train_feed_dict)
-            # print 'Step %d, %s' % (curr_step, time.time())
             curr_step += 1
             if curr_step % check_step == 0:
                 dev_acc = self.accuracy.eval(dev_feed_dict)
@@ -168,7 +167,6 @@ class CNN(object):
         meta_path = os.path.join(root_path, model_name+'.meta')
         para_path = os.path.join(root_path, model_name+'.data-00000-of-00001')
         sess = tf.InteractiveSession()
-        # self.saver = tf.train.Saver()
         self.saver = tf.train.import_meta_graph(meta_path)
         self.saver.restore(sess, para_path)
         test_feed_dict = {

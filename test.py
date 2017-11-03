@@ -2,13 +2,13 @@ import numpy as np
 import tensorflow as tf
 import os
 
-import data_helper as dh
+import utils.data_helpers as dh
 from model.cnn import CNN
 from train import train_cnn as train_cnn
 
 __author__ = 'Qi Hu'
 __date__ = 'June 15, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 
 def test_cnn(root_path, step_max_devacc, max_devacc):

@@ -2,12 +2,12 @@
 
 import numpy as np
 
-import data_helper as dh
+import utils.data_helpers as dh
 from model.cnn_droplater import CNN
 
 __author__ = 'Qi Hu'
 __date__ = 'June 15, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 
 def get_items(data, index):
@@ -75,8 +75,6 @@ def train_cnn():
     test_word = get_items(test_word, test_list)
     test_vds = get_items(test_vds, test_list)
     test_reg = get_items(test_reg, test_list)
-
-    # print test_vds[0]
 
     vocab_size = len(word2id)
     reg_size = len(reg2id)

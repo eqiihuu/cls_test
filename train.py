@@ -1,11 +1,11 @@
 import numpy as np
 
-import data_helper as dh
+import utils.data_helpers as dh
 from model.cnn_droplater import CNN
 
 __author__ = 'Qi Hu'
 __date__ = 'June 15, 2017'
-__email__ = 'qihu@mobvoi.com'
+__email__ = 'qihuchn@gmail.com'
 
 
 def train_cnn():
